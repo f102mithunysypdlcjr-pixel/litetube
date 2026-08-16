@@ -24,11 +24,11 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
       - name: Generate signing key
-        env:
-          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          ALIAS: ${{ secrets.ALIAS }}
         run: |
+          set -e
+          KEY_STORE_PASSWORD=$(openssl rand -hex 12)
+          ALIAS="ciupload"
+
           keytool -genkeypair \
             -v \
             -keystore "$GITHUB_WORKSPACE/key.jks" \
@@ -37,15 +37,28 @@ jobs:
             -keysize 2048 \
             -validity 10000 \
             -storepass "$KEY_STORE_PASSWORD" \
-            -keypass "$KEY_PASSWORD" \
+            -keypass "$KEY_STORE_PASSWORD" \
             -dname "CN=CI Build, OU=CI, O=CI, L=CI, S=CI, C=US"
 
           cat > "$GITHUB_WORKSPACE/keystore.properties" <<EOF
           storeFile=$GITHUB_WORKSPACE/key.jks
           storePassword=$KEY_STORE_PASSWORD
           keyAlias=$ALIAS
-          keyPassword=$KEY_PASSWORD
+          keyPassword=$KEY_STORE_PASSWORD
           EOF
+      - name: Verify signing key readable
+        run: |
+          set -e
+          source_props() {
+            grep "^$1=" "$GITHUB_WORKSPACE/keystore.properties" | cut -d= -f2-
+          }
+          STOREPASS=$(source_props storePassword)
+          KEYALIAS=$(source_props keyAlias)
+          keytool -list -v \
+            -keystore "$GITHUB_WORKSPACE/key.jks" \
+            -alias "$KEYALIAS" \
+            -storepass "$STOREPASS" > /dev/null
+          echo "Keystore OK: alias $KEYALIAS is readable with the given passwords."
       - name: Build signed Stable Release APK
         run: ./gradlew clean assembleStstableRelease --stacktrace
       - name: Find generated APK
