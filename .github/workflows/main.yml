@@ -1,4 +1,4 @@
-name: Build Debug APK
+name: Build Release APK
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Build SmartTube Debug APKs
+    name: Build Signed Stable Release APK
     runs-on: ubuntu-22.04
 
     steps:
@@ -30,39 +30,38 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
-      - name: Show Java and Gradle versions
+      - name: Restore signing key
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
-          java -version
-          ./gradlew --version
+          echo "$SIGNING_KEY" | base64 --decode > key.jks
 
-      - name: Build Stable Debug APK
-        run: ./gradlew clean assembleStstableDebug --stacktrace
-
-      - name: Save Stable Debug APK
+      - name: Build signed Stable Release APK
+        env:
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          ALIAS: ${{ secrets.ALIAS }}
         run: |
-          mkdir -p artifacts/stable
-          find smarttubetv/build/outputs/apk -type f -name "*.apk" -exec cp {} artifacts/stable/ \;
+          ./gradlew clean assembleStstableRelease \
+            -PstoreFile="$GITHUB_WORKSPACE/key.jks" \
+            -PstorePassword="$KEY_STORE_PASSWORD" \
+            -PkeyAlias="$ALIAS" \
+            -PkeyPassword="$KEY_PASSWORD" \
+            --stacktrace
 
-      - name: Build Beta Debug APK
-        run: ./gradlew assembleStbetaDebug --stacktrace
-
-      - name: Save Beta Debug APK
+      - name: Find generated APK
         run: |
-          mkdir -p artifacts/beta
-          find smarttubetv/build/outputs/apk -type f -name "*.apk" -exec cp {} artifacts/beta/ \;
+          echo "Generated APK:"
+          find smarttubetv/build/outputs/apk -type f -name "*.apk" -print
 
-      - name: Upload Stable Debug APK
+      - name: Upload signed Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: SmartTube-Stable-Debug
-          path: artifacts/stable/*.apk
+          name: litetube-stable-release
+          path: smarttubetv/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload Beta Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: SmartTube-Beta-Debug
-          path: artifacts/beta/*.apk
-          if-no-files-found: error
-          retention-days: 7
+      - name: Delete signing key
+        if: always()
+        run: rm -f key.jks
