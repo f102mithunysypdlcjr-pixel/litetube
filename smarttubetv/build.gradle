@@ -30,15 +30,8 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
-// The first letter of the flavor name must be in uppercase
-if (new File("${projectDir}/google-services.json").exists() && (getGradle().getStartParameter().getTaskRequests().toString().contains("Stbeta") ||
-        getGradle().getStartParameter().getTaskRequests().toString().contains("Ststable"))) {
-    // Google Services Gradle plugin (transforms google-services.json file)
-    apply plugin: 'com.google.gms.google-services'
-
-    // Apply the Crashlytics Gradle plugin
-    apply plugin: 'com.google.firebase.crashlytics'
-}
+// Crashlytics/Google Services disabled for a lean, telemetry-free build.
+// (was: applied automatically when google-services.json is present for Stbeta/Ststable)
 
 android {
     // FIX: Default interface methods are only supported starting with Android N (--min-api 24)
@@ -232,14 +225,6 @@ dependencies {
     implementation 'io.reactivex.rxjava2:rxjava:' + rxJavaVersion
 
     // Add the Firebase Crashlytics SDK.
-
-    stbetaImplementation('com.google.firebase:firebase-crashlytics:' + firebaseCrashlyticsVersion) {
-        transitive = true
-    }
-
-    ststableImplementation('com.google.firebase:firebase-crashlytics:' + firebaseCrashlyticsVersion) {
-        transitive = true
-    }
 
     // debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.14'
 

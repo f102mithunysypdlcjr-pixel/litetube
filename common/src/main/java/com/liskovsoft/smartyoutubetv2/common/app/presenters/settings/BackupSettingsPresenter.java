@@ -71,7 +71,6 @@ public class BackupSettingsPresenter extends BasePresenter<Void> {
 
         appendLocalBackupCategory(settingsPresenter);
         appendGDriveBackupCategory(settingsPresenter);
-        appendSubscriptionsBackupButton(settingsPresenter);
         settingsPresenter.showDialog(getContext().getString(R.string.app_backup_restore), BackupSettingsPresenter::unhold);
     }
 
@@ -203,10 +202,6 @@ public class BackupSettingsPresenter extends BasePresenter<Void> {
                 option -> {
                     backupManager.getBackupNames(names -> showLocalRestoreDialog(backupManager, names));
                 }));
-    }
-
-    private void appendSubscriptionsBackupButton(AppDialogPresenter settingsPresenter) {
-        settingsPresenter.appendSingleButton(AppDialogUtil.createSubscriptionsBackupButton(getContext()));
     }
 
     private void showLocalRestoreDialog(BackupAndRestoreManager backupManager, List<String> backups) {
