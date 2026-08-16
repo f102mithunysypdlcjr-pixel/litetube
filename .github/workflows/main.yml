@@ -1,48 +1,68 @@
-name: Debug APK
+name: Build Debug APK
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - main
-  pull_request:
+      - master
 
 permissions:
   contents: read
 
 jobs:
-  build-debug:
-    runs-on: ubuntu-latest
+  build:
+    name: Build SmartTube Debug APKs
+    runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Set up JDK 17
+      - name: Set up JDK 14
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '17'
+          distribution: zulu
+          java-version: '14'
+          cache: gradle
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
 
-      - name: Build beta debug APK
+      - name: Show Java and Gradle versions
+        run: |
+          java -version
+          ./gradlew --version
+
+      - name: Build Stable Debug APK
+        run: ./gradlew clean assembleStstableDebug --stacktrace
+
+      - name: Save Stable Debug APK
+        run: |
+          mkdir -p artifacts/stable
+          find smarttubetv/build/outputs/apk -type f -name "*.apk" -exec cp {} artifacts/stable/ \;
+
+      - name: Build Beta Debug APK
         run: ./gradlew assembleStbetaDebug --stacktrace
 
-      - name: Build stable debug APK
-        run: ./gradlew assembleStstableDebug --stacktrace
+      - name: Save Beta Debug APK
+        run: |
+          mkdir -p artifacts/beta
+          find smarttubetv/build/outputs/apk -type f -name "*.apk" -exec cp {} artifacts/beta/ \;
 
-      - name: Upload beta debug APK
+      - name: Upload Stable Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: smarttube-beta-debug
-          path: smarttubetv/build/outputs/apk/**/*.apk
+          name: SmartTube-Stable-Debug
+          path: artifacts/stable/*.apk
           if-no-files-found: error
+          retention-days: 7
 
-      - name: Upload stable debug APK
+      - name: Upload Beta Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: smarttube-stable-debug
-          path: smarttubetv/build/outputs/apk/**/*.apk
+          name: SmartTube-Beta-Debug
+          path: artifacts/beta/*.apk
           if-no-files-found: error
+          retention-days: 7
