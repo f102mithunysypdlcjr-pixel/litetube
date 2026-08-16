@@ -60,6 +60,9 @@ dependencies {
 
     implementation project(':sharedutils')
     implementation project(':fragment-1.1.0')
+    // Needed directly now: 'common' used to reach leanback-1.0.0's resources (e.g. R.id.lb_control_closed_captioning)
+    // transitively through leanbackassistant. That module is gone in this fork, so declare it explicitly.
+    implementation project(':leanback-1.0.0')
     implementation project(':mediaserviceinterfaces')
     implementation project(':youtubeapi')
 
