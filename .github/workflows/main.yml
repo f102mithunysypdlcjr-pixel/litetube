@@ -15,18 +15,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
       - name: Set up JDK 14
         uses: actions/setup-java@v4
         with:
           distribution: zulu
           java-version: '14'
           cache: gradle
+
       - name: Make Gradle executable
         run: chmod +x ./gradlew
+
       - name: Generate signing key
         run: |
-          KEY_STORE_PASSWORD=$(openssl rand -base64 12)
-          KEY_PASSWORD=$(openssl rand -base64 12)
+          set -e
+          PASS=$(openssl rand -hex 16)
           ALIAS="ciupload"
 
           keytool -genkeypair \
@@ -36,22 +39,43 @@ jobs:
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
-            -storepass "$KEY_STORE_PASSWORD" \
-            -keypass "$KEY_PASSWORD" \
+            -storetype PKCS12 \
+            -storepass "$PASS" \
+            -keypass "$PASS" \
             -dname "CN=CI Build, OU=CI, O=CI, L=CI, S=CI, C=US"
 
           cat > "$GITHUB_WORKSPACE/keystore.properties" <<EOF
           storeFile=$GITHUB_WORKSPACE/key.jks
-          storePassword=$KEY_STORE_PASSWORD
+          storePassword=$PASS
           keyAlias=$ALIAS
-          keyPassword=$KEY_PASSWORD
+          keyPassword=$PASS
           EOF
+
+          echo "::add-mask::$PASS"
+
+      - name: Verify signing key is actually decryptable
+        run: |
+          set -e
+          STOREPASS=$(grep '^storePassword=' "$GITHUB_WORKSPACE/keystore.properties" | cut -d= -f2-)
+          KEYALIAS=$(grep '^keyAlias=' "$GITHUB_WORKSPACE/keystore.properties" | cut -d= -f2-)
+
+          keytool -certreq \
+            -alias "$KEYALIAS" \
+            -keystore "$GITHUB_WORKSPACE/key.jks" \
+            -storepass "$STOREPASS" \
+            -keypass "$STOREPASS" \
+            -file /tmp/csr.pem
+
+          echo "Private key IS decryptable — proceeding to build."
+
       - name: Build signed Stable Release APK
-        run: ./gradlew clean assembleStstableRelease --stacktrace
+        run: ./gradlew clean assembleStstableRelease --stacktrace --max-workers=1
+
       - name: Find generated APK
         run: |
           echo "Generated APK:"
           find smarttubetv/build/outputs/apk -type f -name "*.apk" -print
+
       - name: Upload signed Release APK
         uses: actions/upload-artifact@v4
         with:
@@ -59,6 +83,7 @@ jobs:
           path: smarttubetv/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 7
+
       - name: Delete signing key
         if: always()
         run: rm -f key.jks keystore.properties
