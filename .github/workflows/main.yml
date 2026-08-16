@@ -30,29 +30,34 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
-      - name: Restore signing key
+      - name: Restore signing key and properties
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-        run: |
-          echo "$SIGNING_KEY" | base64 --decode > key.jks
-
-      - name: Build signed Stable Release APK
-        env:
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           ALIAS: ${{ secrets.ALIAS }}
         run: |
-          ./gradlew clean assembleStstableRelease \
-            -PstoreFile="$GITHUB_WORKSPACE/key.jks" \
-            -PstorePassword="$KEY_STORE_PASSWORD" \
-            -PkeyAlias="$ALIAS" \
-            -PkeyPassword="$KEY_PASSWORD" \
-            --stacktrace
+          echo "$SIGNING_KEY" | base64 --decode > "$GITHUB_WORKSPACE/key.jks"
+          cat > "$GITHUB_WORKSPACE/keystore.properties" <<EOF
+          storeFile=$GITHUB_WORKSPACE/key.jks
+          storePassword=$KEY_STORE_PASSWORD
+          keyAlias=$ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Build signed Stable Release APK
+        run: ./gradlew clean assembleStstableRelease --stacktrace
 
       - name: Find generated APK
         run: |
           echo "Generated APK:"
           find smarttubetv/build/outputs/apk -type f -name "*.apk" -print
+
+      - name: Verify APK is signed
+        run: |
+          APK=$(find smarttubetv/build/outputs/apk -name "*release*.apk" | head -1)
+          echo "Checking: $APK"
+          unzip -l "$APK" | grep -Ei 'META-INF/.*\.(RSA|DSA|EC)$' || { echo "::error::APK is NOT signed!"; exit 1; }
 
       - name: Upload signed Release APK
         uses: actions/upload-artifact@v4
@@ -64,4 +69,4 @@ jobs:
 
       - name: Delete signing key
         if: always()
-        run: rm -f key.jks
+        run: rm -f key.jks keystore.properties
